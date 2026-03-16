@@ -43,6 +43,7 @@ const FeatureCard3D = ({ children, index }: { children: React.ReactNode; index: 
   const glareY = useTransform(y, [-150, 150], [0, 100]);
 
   const handleMouse = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (window.matchMedia("(hover: none)").matches) return;
     const rect = e.currentTarget.getBoundingClientRect();
     x.set(e.clientX - rect.left - rect.width / 2);
     y.set(e.clientY - rect.top - rect.height / 2);

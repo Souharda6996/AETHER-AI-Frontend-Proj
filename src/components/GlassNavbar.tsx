@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Zap } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const navLinks = [
   { label: "Features", href: "#features" },
@@ -91,14 +92,15 @@ const GlassNavbar = () => {
 
         <div className="flex flex-1 justify-end">
           <div className="hidden md:block">
-            <motion.button
-              onClick={() => handleClick("#pricing")}
-              className="whitespace-nowrap rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground"
-              whileHover={{ scale: 1.02, y: -2 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              Deploy Aether
-            </motion.button>
+            <Link to="/chat">
+              <motion.button
+                className="whitespace-nowrap rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground shadow-[0_0_15px_rgba(var(--primary-rgb),0.5)]"
+                whileHover={{ scale: 1.05, y: -2, boxShadow: "0_0_25px_rgba(var(--primary-rgb),0.6)" }}
+                whileTap={{ scale: 0.95 }}
+              >
+                Launch Aether
+              </motion.button>
+            </Link>
           </div>
 
           <button
@@ -118,22 +120,24 @@ const GlassNavbar = () => {
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden md:hidden"
           >
-            <div className="flex flex-col gap-2 px-6 pb-4">
+            <div className="flex flex-col gap-2 px-6 pb-6 pt-2 glass m-2 rounded-xl border border-white/5 shadow-2xl">
               {navLinks.map((link) => (
-                <button
+                <motion.button
                   key={link.href}
                   onClick={() => handleClick(link.href)}
-                  className="text-left py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-left py-3 text-base font-medium text-muted-foreground hover:text-foreground transition-colors border-b border-white/5 last:border-0"
+                  whileTap={{ x: 5, color: "var(--primary)" }}
                 >
                   {link.label}
-                </button>
+                </motion.button>
               ))}
-              <button
+              <motion.button
                 onClick={() => handleClick("#pricing")}
-                className="whitespace-nowrap mt-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground"
+                className="whitespace-nowrap mt-4 rounded-lg bg-primary px-5 py-3 text-base font-semibold text-primary-foreground shadow-lg"
+                whileTap={{ scale: 0.95 }}
               >
                 Deploy Aether
-              </button>
+              </motion.button>
             </div>
           </motion.div>
         )}

@@ -41,6 +41,7 @@ const PricingCard3D = ({ children, index, highlighted }: { children: React.React
   const glareY = useTransform(y, [-150, 150], [0, 100]);
 
   const handleMouse = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (window.matchMedia("(hover: none)").matches) return;
     const rect = e.currentTarget.getBoundingClientRect();
     x.set(e.clientX - rect.left - rect.width / 2);
     y.set(e.clientY - rect.top - rect.height / 2);

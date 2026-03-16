@@ -17,6 +17,7 @@ const HeroSection = () => {
   const springY = useSpring(mouseY, { stiffness: 50, damping: 20 });
 
   const handleMouseMove = (e: React.MouseEvent) => {
+    if (window.matchMedia("(hover: none)").matches) return;
     const rect = e.currentTarget.getBoundingClientRect();
     mouseX.set((e.clientX - rect.left - rect.width / 2) * 0.02);
     mouseY.set((e.clientY - rect.top - rect.height / 2) * 0.02);
@@ -95,7 +96,7 @@ const HeroSection = () => {
           >
             <motion.div {...textReveal}>
               <h1
-                className="font-display text-5xl sm:text-6xl lg:text-7xl xl:text-8xl leading-[0.9] text-foreground tracking-tighter"
+                className="font-display text-4xl sm:text-6xl lg:text-7xl xl:text-8xl leading-[0.9] text-foreground tracking-tighter"
               >
                 <span className="text-gradient drop-shadow-[0_0_35px_rgba(0,186,224,0.3)]">AETHER</span>
                 <br />
@@ -173,7 +174,7 @@ const HeroSection = () => {
             <motion.img
               src={mascot}
               alt="Aether AI Mascot - Futuristic AI Orb"
-              className="relative z-10 w-72 h-72 sm:w-96 sm:h-96 object-contain animate-float drop-shadow-2xl"
+              className="relative z-10 w-64 h-64 sm:w-96 sm:h-96 object-contain animate-float drop-shadow-2xl"
               initial={{ scale: 0, rotate: -180 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ type: "spring", damping: 15, stiffness: 80, delay: 0.2 }}

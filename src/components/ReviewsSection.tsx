@@ -44,6 +44,7 @@ const ReviewCard3D = ({ children, index }: { children: React.ReactNode; index: n
   const glareY = useTransform(y, [-150, 150], [0, 100]);
 
   const handleMouse = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (window.matchMedia("(hover: none)").matches) return;
     const rect = e.currentTarget.getBoundingClientRect();
     x.set(e.clientX - rect.left - rect.width / 2);
     y.set(e.clientY - rect.top - rect.height / 2);
@@ -114,7 +115,7 @@ const ReviewsSection = () => {
         {reviews.map((review, i) => (
           <ReviewCard3D key={review.name} index={i}>
             <motion.div
-              className="glass-card p-8 min-w-[350px] max-w-[400px] h-full shrink-0 relative overflow-hidden"
+              className="glass-card p-8 min-w-[280px] sm:min-w-[350px] max-w-[400px] h-full shrink-0 relative overflow-hidden"
               whileHover={{ scale: 1.05, y: -10 }}
               transition={{ type: "spring", stiffness: 400, damping: 20 }}
             >

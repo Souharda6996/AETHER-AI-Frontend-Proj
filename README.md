@@ -1,11 +1,19 @@
 # ⚡ AETHER AI — Autonomous Enterprise Intelligence
 
 [![GitHub stars](https://img.shields.io/github/stars/Souharda6996/AETHER-AI-Frontend-Proj?style=for-the-badge&color=00BAE0&labelColor=1a1a1a)](https://github.com/Souharda6996/AETHER-AI-Frontend-Proj/stargazers)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-🚀-00BAE0?style=for-the-badge&labelColor=1a1a1a)](https://aether-ai-pro.vercel.app/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-00BAE0?style=for-the-badge&labelColor=1a1a1a)](https://opensource.org/licenses/MIT)
+
 
 **AETHER AI** is the first autonomous enterprise agent built for high-performance spatial workflows. Engineered with a **47ms P95 latency** and zero-trust security architecture, Aether deploys intelligent, self-correcting agents that scale with your infrastructure.
 
 ---
+
+## 🚀 Live Demo
+Experience Aether AI in action: **[aether-ai-pro.vercel.app](https://aether-ai-pro.vercel.app/)**
+
+---
+
 
 ## 💎 Premium Experience
 The frontend is designed with a **"High-End Spatial"** aesthetic, featuring:

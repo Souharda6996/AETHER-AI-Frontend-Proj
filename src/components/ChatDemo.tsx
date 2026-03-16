@@ -35,26 +35,37 @@ const ChatDemo = () => {
     }
   }, [messages, displayedBotText]);
 
-  const simulateBotResponse = (responseText: string) => {
+  const streamResponse = async (msg: string) => {
     setIsTyping(true);
+    // Simulate initial network/processing delay showing the 3 dots
+    await new Promise(resolve => setTimeout(resolve, 400));
+    setIsTyping(false);
+
     const botId = idCounter.current++;
+    setMessages((prev) => [...prev, { id: botId, role: "bot", text: "" }]);
+    setTypingMessageId(botId);
+    setDisplayedBotText("");
 
-    setTimeout(() => {
-      setIsTyping(false);
-      setTypingMessageId(botId);
-      setMessages((prev) => [...prev, { id: botId, role: "bot", text: responseText }]);
+    const predefined = sampleConversations.find(c => c.trigger.toLowerCase() === msg.toLowerCase());
+    const textToStream = predefined 
+      ? predefined.response 
+      : "I'm a demo representation of Aether. In the full product, I would use advanced dynamic reasoning to answer your query. Go to the Main Intelligence Terminal for full capabilities.";
 
-      let i = 0;
-      setDisplayedBotText("");
-      const interval = setInterval(() => {
-        i++;
-        setDisplayedBotText(responseText.slice(0, i));
-        if (i >= responseText.length) {
-          clearInterval(interval);
-          setTypingMessageId(null);
+    let currentText = "";
+    // Speed up simulation to look like fast token streaming
+    const words = textToStream.split(/(\s+)/);
+    
+    for (let i = 0; i < words.length; i++) {
+        currentText += words[i];
+        setDisplayedBotText(currentText);
+        // Only delay on actual words, not spaces, to simulate token generation
+        if (words[i].trim() !== "") {
+            await new Promise(resolve => setTimeout(resolve, typingSpeed)); 
         }
-      }, typingSpeed);
-    }, 1200);
+    }
+
+    setMessages((prev) => prev.map(m => m.id === botId ? { ...m, text: currentText } : m));
+    setTypingMessageId(null);
   };
 
   const handleSend = (text?: string) => {
@@ -65,14 +76,7 @@ const ChatDemo = () => {
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
 
-    const match = sampleConversations.find(
-      (c) => c.trigger.toLowerCase() === msg.toLowerCase()
-    );
-    const response = match
-      ? match.response
-      : "That's a great question! In production, I'd connect to your knowledge base and provide a precise answer. For this demo, try one of the suggested prompts to see my capabilities in action.";
-
-    simulateBotResponse(response);
+    streamResponse(msg);
   };
 
   const suggestedPrompts = sampleConversations.slice(0, 3).map((c) => c.trigger);
