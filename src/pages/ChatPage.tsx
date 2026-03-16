@@ -405,7 +405,7 @@ const ChatPage = () => {
         {/* Message View */}
         <div 
           ref={scrollRef}
-          className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 space-y-8 custom-scrollbar scroll-smooth"
+          className="flex-1 overflow-y-auto overflow-x-hidden w-full max-w-[100vw] box-border px-[12px] py-4 md:px-8 md:py-8 space-y-8 custom-scrollbar scroll-smooth"
         >
           <div className="w-full max-w-3xl mx-auto space-y-8 pb-12">
             <AnimatePresence>
@@ -424,13 +424,22 @@ const ChatPage = () => {
                     {msg.role === "assistant" ? <Bot className="h-5 w-5" /> : <User className="h-5 w-5" />}
                   </div>
                   <div className={`flex flex-col min-w-0 max-w-[85%] sm:max-w-[75%] ${msg.role === "assistant" ? "" : "items-end"}`}>
-                    <div className={`rounded-2xl px-5 py-3.5 text-sm leading-relaxed shadow-sm whitespace-pre-wrap word-break break-words overflow-x-auto custom-markdown ${
+                    <div className={`rounded-2xl px-5 py-3.5 text-sm leading-relaxed shadow-sm whitespace-pre-wrap break-words [word-break:break-word] max-w-full w-full box-border overflow-x-auto custom-markdown ${
                       msg.role === "assistant"
                         ? "bg-[#0f0f1c] border border-[#1a1a2e] text-foreground/90 font-medium"
                         : "bg-primary text-primary-foreground font-semibold shadow-[0_0_15px_rgba(var(--primary-rgb),0.3)]"
                     }`}>
                       {msg.role === "assistant" ? (
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            table: ({node, ...props}) => (
+                              <div className="w-full max-w-full overflow-x-auto">
+                                <table className="w-full min-w-[unset]" {...props} />
+                              </div>
+                            )
+                          }}
+                        >
                           {msg.content}
                         </ReactMarkdown>
                       ) : (
@@ -492,8 +501,17 @@ const ChatPage = () => {
                       </div>
                     </div>
                   ) : (
-                    <div className="rounded-2xl px-5 py-3.5 text-sm leading-relaxed shadow-sm whitespace-pre-wrap bg-[#0f0f1c] border border-[#1a1a2e] text-foreground/90 font-medium overflow-x-auto custom-markdown">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    <div className="rounded-2xl px-5 py-3.5 text-sm leading-relaxed shadow-sm whitespace-pre-wrap break-words [word-break:break-word] max-w-full w-full box-border bg-[#0f0f1c] border border-[#1a1a2e] text-foreground/90 font-medium overflow-x-auto custom-markdown">
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          table: ({node, ...props}) => (
+                            <div className="w-full max-w-full overflow-x-auto">
+                              <table className="w-full min-w-[unset]" {...props} />
+                            </div>
+                          )
+                        }}
+                      >
                         {streamingMessage}
                       </ReactMarkdown>
                       <motion.span
