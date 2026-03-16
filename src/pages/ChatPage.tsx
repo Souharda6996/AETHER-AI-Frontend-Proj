@@ -407,14 +407,14 @@ const ChatPage = () => {
           ref={scrollRef}
           className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 space-y-8 custom-scrollbar scroll-smooth"
         >
-          <div className="max-w-3xl mx-auto space-y-8 pb-12">
+          <div className="w-full max-w-3xl mx-auto space-y-8 pb-12">
             <AnimatePresence>
               {messages.map((msg, index) => (
                 <motion.div
                   key={msg.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`flex gap-4 ${msg.role === "assistant" ? "" : "flex-row-reverse"}`}
+                  className={`flex w-full gap-4 ${msg.role === "assistant" ? "" : "flex-row-reverse"}`}
                 >
                   <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 shadow-lg ${
                     msg.role === "assistant" 
@@ -473,7 +473,7 @@ const ChatPage = () => {
               <motion.div 
                 initial={{ opacity: 0, y: 10 }} 
                 animate={{ opacity: 1, y: 0 }}
-                className="flex gap-4"
+                className="flex w-full gap-4"
               >
                 <div className="h-9 w-9 rounded-xl bg-primary/20 text-primary border border-primary/20 flex items-center justify-center shrink-0 shadow-lg">
                   <Bot className="h-5 w-5" />
