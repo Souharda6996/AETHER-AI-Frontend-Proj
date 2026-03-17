@@ -144,9 +144,9 @@ const FounderSection = () => {
               </motion.div>
 
               <div className="w-56 h-56 md:w-72 md:h-72 shrink-0 relative z-10 rounded-2xl overflow-hidden shadow-2xl border border-white/10 group-hover:border-primary/50 transition-colors duration-500">
-                <img 
-                  src="/founder.jpg" 
-                  alt="Souharda Mandal" 
+                <img
+                  src="/founder.jpeg"
+                  alt="Souharda Mandal"
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
@@ -158,9 +158,9 @@ const FounderSection = () => {
               <div className="relative z-10 text-center md:text-left flex-1">
                 <h3 className="font-display text-3xl md:text-4xl lg:text-5xl text-foreground mb-2">Souharda Mandal</h3>
                 <p className="text-primary font-mono-custom text-sm md:text-md tracking-wide mb-6">AI Engineer & B.Tech CSE (AI & ML)</p>
-                
+
                 <p className="text-muted-foreground text-sm md:text-base leading-relaxed mb-8">
-                  An innovator at the intersection of Agentic RAG and high-performance software, I developed AETHER-Ai to bridge the gap between complex AI architecture and seamless user experience. Combining technical precision with the disciplined leadership of an NCC Sergeant, my mission is to build intelligent systems that are as reliable as they are revolutionary.
+                  An innovator at the intersection of Agentic RAG and high-performance software, I developed AETHER-Ai to bridge the gap between complex AI architecture and seamless user experience, my mission is to build intelligent systems that are as reliable as they are revolutionary.
                 </p>
 
                 <div className="flex flex-wrap gap-3 justify-center md:justify-start">
