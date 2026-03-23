@@ -147,7 +147,7 @@ function getWelcomeMessage(name: string): string {
           <!-- CTA Button -->
           <tr>
             <td style="padding:0 40px 32px;text-align:center;">
-              <a href="https://aether-ai-frontend-proj.vercel.app/chat" 
+              <a href="https://aether-ai-frontend-proj.vercel.app" 
                  style="display:inline-block;padding:14px 36px;background:linear-gradient(135deg,#c8a44e,#e8c86e);color:#050508;font-size:14px;font-weight:700;text-decoration:none;border-radius:12px;letter-spacing:0.5px;">
                 LAUNCH AETHER →
               </a>
