@@ -381,7 +381,7 @@ const ChatPage = () => {
           <Link to="/" className="flex items-center gap-2 group">
             <ArrowLeft className="h-4 w-4 text-[#5A8F76] group-hover:text-[#C18D52] transition-colors" />
             <div className="flex items-center gap-2">
-              <img src="/aether-logo.jpeg" alt="Aether AI" className="h-7 w-7 rounded-lg shadow-[0_0_15px_rgba(193,141,82,0.3)] animate-pulse" />
+              <img src="/aether-logo.png" alt="Aether AI" className="h-7 w-7 rounded-lg shadow-[0_0_15px_rgba(193,141,82,0.3)] animate-pulse" />
               <span className="font-display text-xl tracking-tight text-[#C18D52]">AETHER</span>
             </div>
           </Link>

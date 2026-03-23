@@ -20,7 +20,7 @@ const FooterSection = () => {
               className="flex items-center gap-2 text-[#EEE8B2] mb-4"
               whileHover={{ scale: 1.05 }}
             >
-              <img src="/aether-logo.jpeg" alt="Aether AI" className="h-6 w-6 rounded-md" />
+              <img src="/aether-logo.png" alt="Aether AI" className="h-6 w-6 rounded-md" />
               <span className="font-display text-lg text-[#C18D52]">AETHER</span>
             </motion.a>
             <p className="text-sm text-[#5A8F76] leading-relaxed">

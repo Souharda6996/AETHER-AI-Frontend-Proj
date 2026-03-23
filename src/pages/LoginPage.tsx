@@ -33,7 +33,7 @@ const LoginPage = () => {
         <Link to="/" className="flex items-center gap-2 group w-fit">
           <ArrowLeft className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
           <div className="flex items-center gap-2">
-            <img src="/aether-logo.jpeg" alt="Aether AI" className="h-7 w-7 rounded-md" />
+            <img src="/aether-logo.png" alt="Aether AI" className="h-7 w-7 rounded-md" />
             <span className="font-display text-xl tracking-tight">AETHER</span>
           </div>
         </Link>
@@ -56,7 +56,7 @@ const LoginPage = () => {
               transition={{ delay: 0.2, duration: 0.5, type: 'spring' }}
               className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(0,229,255,0.15)] ring-1 ring-primary/20"
             >
-              <img src="/aether-logo.jpeg" alt="Aether AI" className="h-10 w-10 rounded-lg drop-shadow-[0_0_15px_rgba(193,141,82,0.5)]" />
+              <img src="/aether-logo.png" alt="Aether AI" className="h-10 w-10 rounded-lg drop-shadow-[0_0_15px_rgba(193,141,82,0.5)]" />
             </motion.div>
             
             <motion.h1 
