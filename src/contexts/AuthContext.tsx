@@ -47,9 +47,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const additionalInfo = getAdditionalUserInfo(result);
     console.log("🔐 Google login — isNewUser:", additionalInfo?.isNewUser, "email:", result.user?.email);
 
-    // Send welcome email on login
-    if (result.user) {
-      console.log("📧 Triggering welcome email for:", result.user.email);
+    // Send welcome email only for first-time Google sign-ins
+    if (additionalInfo?.isNewUser && result.user) {
+      console.log("📧 Triggering welcome email for new user:", result.user.email);
       sendWelcomeEmail(
         result.user.displayName || "Explorer",
         result.user.email || ""
@@ -58,15 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginWithEmail = async (email: string, pass: string) => {
-    const result = await signInWithEmailAndPassword(auth, email, pass);
-    // Send welcome email on email login too
-    if (result.user) {
-      console.log("📧 Triggering welcome email for email login:", result.user.email);
-      sendWelcomeEmail(
-        result.user.displayName || email.split("@")[0],
-        result.user.email || email
-      );
-    }
+    await signInWithEmailAndPassword(auth, email, pass);
   };
 
   const signupWithEmail = async (email: string, pass: string) => {
