@@ -236,10 +236,9 @@ const ChatPage = () => {
     setIsStreaming(true)
 
     try {
-      // 2. Determine API URL based on framework
-      // Vite+Express: 'http://localhost:3001/api/chat'
-      const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
-      const API_ENDPOINT = `${BACKEND_BASE}/api/chat`
+      // 2. Use relative path for Vercel Serverless Functions
+      // When deployed, frontend and backend share the same base URL
+      const API_ENDPOINT = '/api/chat'
 
       // 3. Build full conversation history
       const history = [...messages.filter(m => m.id !== "initial-1"), userMsg].map(m => ({
