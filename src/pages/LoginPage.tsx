@@ -6,31 +6,9 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
 const LoginPage = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [isLogin, setIsLogin] = useState(true);
   const [loadingAction, setLoadingAction] = useState(false);
-  const { loginWithEmail, signupWithEmail, loginWithGoogle } = useAuth();
+  const { loginWithGoogle } = useAuth();
   const navigate = useNavigate();
-
-  const handleEmailAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password) return toast.error("Please fill in all fields.");
-    
-    setLoadingAction(true);
-    try {
-      if (isLogin) {
-        await loginWithEmail(email, password);
-      } else {
-        await signupWithEmail(email, password);
-      }
-      navigate("/chat");
-    } catch (error: any) {
-      toast.error(error.message || "Failed to authenticate.");
-    } finally {
-      setLoadingAction(false);
-    }
-  };
 
   const handleGoogleAuth = async () => {
     setLoadingAction(true);
@@ -60,54 +38,11 @@ const LoginPage = () => {
         <div className="w-full max-w-md bg-[#0a0a14] border border-[#1a1a2e] rounded-3xl p-8 shadow-2xl">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-display font-bold mb-2">
-              {isLogin ? "Welcome Back" : "Initialize Neural Link"}
+              Welcome Back
             </h1>
             <p className="text-muted-foreground text-sm">
               Authenticate to access the Aether intelligence network.
             </p>
-          </div>
-
-          <form onSubmit={handleEmailAuth} className="space-y-4">
-            <div>
-              <label className="text-[11px] uppercase tracking-widest font-bold text-muted-foreground mb-1 block">
-                Email Address
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-[#0f0f1c] border border-[#1a1a2e] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary/50 transition-colors"
-                placeholder="operative@domain.com"
-                required
-              />
-            </div>
-            <div>
-              <label className="text-[11px] uppercase tracking-widest font-bold text-muted-foreground mb-1 block">
-                Security Keyphrase
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-[#0f0f1c] border border-[#1a1a2e] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary/50 transition-colors"
-                placeholder="••••••••"
-                required
-              />
-            </div>
-            
-            <button
-              type="submit"
-              disabled={loadingAction}
-              className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center disabled:opacity-50 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-[0_0_20px_rgba(0,229,255,0.2)]"
-            >
-              {loadingAction ? <Loader2 className="h-5 w-5 animate-spin" /> : (isLogin ? "Authenticate" : "Establish Link")}
-            </button>
-          </form>
-
-          <div className="my-6 flex items-center gap-4">
-            <div className="flex-1 h-px bg-[#1a1a2e]"></div>
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">OR</span>
-            <div className="flex-1 h-px bg-[#1a1a2e]"></div>
           </div>
 
           <button
@@ -129,18 +64,6 @@ const LoginPage = () => {
               </>
             )}
           </button>
-
-          <div className="mt-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              {isLogin ? "Don't have clearance?" : "Already have clearance?"}
-              <button 
-                onClick={() => setIsLogin(!isLogin)}
-                className="ml-2 text-primary font-semibold hover:underline"
-              >
-                {isLogin ? "Request Access" : "Authenticate Here"}
-              </button>
-            </p>
-          </div>
         </div>
       </main>
     </div>
