@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { Sparkles, Loader2, ArrowLeft } from "lucide-react";
+import { Zap, Loader2, ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -33,7 +33,7 @@ const LoginPage = () => {
         <Link to="/" className="flex items-center gap-2 group w-fit">
           <ArrowLeft className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
           <div className="flex items-center gap-2">
-            <Sparkles className="h-6 w-6 text-primary" />
+            <Zap className="h-6 w-6 text-primary" />
             <span className="font-display text-xl tracking-tight">AETHER</span>
           </div>
         </Link>
@@ -56,7 +56,7 @@ const LoginPage = () => {
               transition={{ delay: 0.2, duration: 0.5, type: 'spring' }}
               className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(0,229,255,0.15)] ring-1 ring-primary/20"
             >
-              <Sparkles className="h-8 w-8 text-primary" />
+              <Zap className="h-8 w-8 text-primary" />
             </motion.div>
             
             <motion.h1 

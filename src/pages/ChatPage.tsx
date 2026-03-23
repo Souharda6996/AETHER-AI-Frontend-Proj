@@ -13,7 +13,7 @@ import {
 } from "firebase/firestore";
 import { 
   Send, Bot, User, Plus, MessageSquare, Settings, LogOut, 
-  Share2, Sparkles, Command, ArrowLeft, Square, Copy, Check, 
+  Share2, Zap, Command, ArrowLeft, Square, Copy, Check, 
   ThumbsUp, ThumbsDown, RefreshCw, Menu, X, Pause, Play
 } from "lucide-react";
 
@@ -381,7 +381,7 @@ const ChatPage = () => {
           <Link to="/" className="flex items-center gap-2 group">
             <ArrowLeft className="h-4 w-4 text-[#5A8F76] group-hover:text-[#C18D52] transition-colors" />
             <div className="flex items-center gap-2">
-              <Sparkles className="h-6 w-6 text-[#C18D52] animate-pulse" />
+              <Zap className="h-6 w-6 text-[#C18D52] animate-pulse" />
               <span className="font-display text-xl tracking-tight text-[#C18D52]">AETHER</span>
             </div>
           </Link>

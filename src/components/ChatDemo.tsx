@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Bot, User, Sparkles } from "lucide-react";
+import { Send, Bot, User, Zap } from "lucide-react";
 
 interface Message {
   id: number;
@@ -113,7 +113,7 @@ const ChatDemo = () => {
             {/* Header */}
             <div className="px-6 py-4 border-b border-muted flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-                <Sparkles className="h-4 w-4 text-primary" />
+                <Zap className="h-4 w-4 text-primary" />
               </div>
               <div>
                 <p className="text-sm font-display text-foreground">Aether AI</p>

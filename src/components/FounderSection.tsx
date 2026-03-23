@@ -1,5 +1,5 @@
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
-import { Sparkles, Brain, Code, Terminal } from "lucide-react";
+import { Zap, Brain, Code, Terminal } from "lucide-react";
 
 const FounderCard3D = ({ children, highlighted }: { children: React.ReactNode; highlighted: boolean }) => {
   const x = useMotionValue(0);
@@ -140,7 +140,7 @@ const FounderSection = () => {
                 viewport={{ once: true }}
                 transition={{ delay: 0.6, type: "spring", damping: 15 }}
               >
-                <Sparkles className="h-3 w-3" /> AETHER-Ai Creator
+                <Zap className="h-3 w-3" /> AETHER-Ai Creator
               </motion.div>
 
               <div className="w-56 h-56 md:w-72 md:h-72 shrink-0 relative z-10 rounded-2xl overflow-hidden shadow-2xl border border-[#5A8F76]/30 group-hover:border-[#C18D52]/50 transition-colors duration-500">
