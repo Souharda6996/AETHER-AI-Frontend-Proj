@@ -1,16 +1,12 @@
 import emailjs from "@emailjs/browser";
 
-const SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
-const TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
-const PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+const SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || "service_giaeqhd";
+const TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || "template_3vlkh4i";
+const PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || "M91IUQy6v3c5Hxkv7";
 
 // Initialize EmailJS with the public key — REQUIRED before any send() call
-if (PUBLIC_KEY) {
-  emailjs.init(PUBLIC_KEY);
-  console.log("✅ EmailJS initialized with public key");
-} else {
-  console.warn("⚠️ EmailJS PUBLIC_KEY is missing — emails will not send");
-}
+emailjs.init(PUBLIC_KEY);
+console.log("✅ EmailJS initialized with public key:", PUBLIC_KEY);
 
 /**
  * Sends a branded Aether welcome email to new users.
