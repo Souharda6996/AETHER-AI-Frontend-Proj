@@ -1,8 +1,8 @@
 import emailjs from "@emailjs/browser";
 
-const SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || "service_giaeqhd";
-const TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || "template_3vlkh4i";
-const PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || "M91IUQy6v3c5Hxkv7";
+const SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || "service_38rmdbg";
+const TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || "template_0r2x32j";
+const PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || "yKmn1KLmcgB0PesMd";
 
 // Initialize EmailJS with the public key — REQUIRED before any send() call
 emailjs.init(PUBLIC_KEY);
