@@ -2,8 +2,8 @@ import mammoth from "mammoth";
 import * as pdfjsLib from "pdfjs-dist";
 import Papa from "papaparse";
 
-// Initialize PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Initialize PDF.js worker directly to the correct version installed in package.json
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/5.5.207/pdf.worker.min.js`;
 
 export const extractTextFromFile = async (file: File): Promise<string> => {
   const fileType = file.type;
@@ -40,7 +40,12 @@ export const extractTextFromFile = async (file: File): Promise<string> => {
       return await fileToBase64(file);
     }
 
-    throw new Error("Unsupported file type for text/content extraction.");
+    // 6. Fallback - Try to read as plain text
+    try {
+      return await parseText(file);
+    } catch {
+      throw new Error(`Unsupported file type: ${file.type} (${file.name}) and could not be read as text.`);
+    }
   } catch (error) {
     console.error("Error parsing file:", error);
     throw new Error(`Failed to read ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -49,7 +54,7 @@ export const extractTextFromFile = async (file: File): Promise<string> => {
 
 const parsePDF = async (file: File): Promise<string> => {
   const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
   let fullText = "";
 
   for (let i = 1; i <= pdf.numPages; i++) {
