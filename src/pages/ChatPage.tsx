@@ -274,30 +274,47 @@ const ChatPage = () => {
     
     setMessages(prev => [...prev, userMsg]);
     setInput('');
-    setIsStreaming(true);
     
     let combinedInputText = trimmedInput;
     let base64Images: string[] = [];
 
+    // --- File Processing (with timeout to prevent infinite hang) ---
     if (selectedFiles.length > 0) {
       setCurrentAgent("Processing Files...");
-      for (const fileObj of selectedFiles) {
-        try {
-          if (fileObj.type === "image") {
-            const b64 = await fileToBase64(fileObj.file);
-            base64Images.push(b64);
-          } else {
-            const extracted = await extractTextFromFile(fileObj.file);
-            combinedInputText += `\n\n--- Content of ${fileObj.file.name} ---\n${extracted}\n--- End of ${fileObj.file.name} ---\n`;
+      try {
+        // Timeout wrapper: rejects if promise takes longer than `ms` milliseconds
+        const withTimeout = (promise: Promise<string>, ms: number, label: string): Promise<string> =>
+          new Promise<string>((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error(`Timed out reading "${label}"`)), ms);
+            promise.then(
+              (val) => { clearTimeout(timer); resolve(val); },
+              (err) => { clearTimeout(timer); reject(err); }
+            );
+          });
+
+        for (const fileObj of selectedFiles) {
+          try {
+            if (fileObj.type === "image") {
+              const b64 = await withTimeout(fileToBase64(fileObj.file), 15000, fileObj.file.name);
+              base64Images.push(b64);
+            } else {
+              const extracted = await withTimeout(extractTextFromFile(fileObj.file), 30000, fileObj.file.name);
+              combinedInputText += `\n\n--- Content of ${fileObj.file.name} ---\n${extracted}\n--- End of ${fileObj.file.name} ---\n`;
+            }
+          } catch (error) {
+            console.error(`Failed to parse ${fileObj.file.name}:`, error);
+            toast.error(`Could not read "${fileObj.file.name}". Sending without its content.`);
           }
-        } catch (error) {
-           console.error(`Failed to parse ${fileObj.file.name}:`, error);
-           toast.error(`Could not read ${fileObj.file.name}`);
         }
+      } finally {
+        // Always clean up file state regardless of success/failure
+        setSelectedFiles([]);
+        setCurrentAgent(null);
       }
-      setSelectedFiles([]);
-      setCurrentAgent(null);
     }
+
+    // Enable streaming AFTER file processing is done so UI never gets stuck
+    setIsStreaming(true);
 
     if (currentUser && convId) {
       await addDoc(collection(db, "users", currentUser.uid, "conversations", convId, "messages"), {
