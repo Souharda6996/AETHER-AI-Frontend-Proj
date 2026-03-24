@@ -11,7 +11,8 @@ app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ limit: '50mb', extended: true }))
 
 app.post('/api/chat', async (req, res) => {
-  const { message, messages, images } = req.body
+  const { message, messages, images, userName } = req.body
+  const nameToUse = userName || 'User';
   
   // 1. Try Anthropic first
   let apiKey = process.env.ANTHROPIC_API_KEY
@@ -97,7 +98,7 @@ app.post('/api/chat', async (req, res) => {
         body: JSON.stringify({
           model:      'claude-3-5-sonnet-20241022',
           max_tokens: 2048,
-          system:     'You are AetherAI, a premium assistant with advanced computer vision capabilities. Analyze the provided images carefully and provide detailed insights.',
+          system:     `You are Aether (Neural Mesh Active), a highly advanced and professional AI assistant. You are communicating with ${nameToUse}. Maintain a tone that is premium, efficient, and precise. If an image or file is provided, analyze it with extreme detail. Always address the user by their name when appropriate to provide a personalized, high-end experience.`,
           messages:   history,
         }),
       });
@@ -117,7 +118,7 @@ app.post('/api/chat', async (req, res) => {
         body: JSON.stringify({
           model: groqModel,
           messages: [
-            { role: 'system', content: 'You are AetherAI, a premium assistant with advanced vision capabilities. You can see and analyze images perfectly. When an image is provided, respond based on what you see in the image.' },
+            { role: 'system', content: `You are Aether (Neural Mesh Active), a highly advanced and professional AI assistant. You are communicating with ${nameToUse}. Maintain a tone that is premium, efficient, and precise. If an image or file is provided, analyze it with extreme detail. Always address the user by their name when appropriate to provide a personalized, high-end experience.` },
             ...history
           ],
           temperature: 0.7,

@@ -258,10 +258,10 @@ const ChatPage = () => {
     }
 
     const attachments = selectedFiles.map(f => {
-      const att: Record<string, any> = {
+      const att: any = {
         name: f.file.name,
         type: f.file.type,
-        size: f.file.size,
+        size: f.file.size || 0,
       };
       if (f.type === 'image' && f.previewUrl) {
         att.previewUrl = f.previewUrl;
@@ -349,6 +349,7 @@ const ChatPage = () => {
         body:    JSON.stringify({ 
           message:  combinedInputText,
           messages: history,
+          userName: currentUser?.displayName || 'User',
           images: base64Images.length > 0 ? base64Images : undefined
         }),
       });
