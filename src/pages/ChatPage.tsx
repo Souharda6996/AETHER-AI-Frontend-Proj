@@ -367,7 +367,7 @@ const ChatPage = () => {
       try {
         data = JSON.parse(rawText);
       } catch {
-        throw new Error('Server returned an invalid response. Please try again.');
+        throw new Error(`Server returned an invalid response (Status ${res.status}). Please try again.`);
       }
 
       // Check for error messages from the server (returned as HTTP 200 with error field)

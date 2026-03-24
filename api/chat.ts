@@ -1,5 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { GROQ_MODELS } from '../config/models';
+// Inlined config to prevent path resolution issues on Vercel deployment
+const GROQ_MODELS = {
+  VISION: "meta-llama/llama-4-scout-17b-16e-instruct",
+  VISION_PRO: "meta-llama/llama-4-maverick-17b-128e-instruct",
+  TEXT: "llama-3.3-70b-versatile",
+};
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Only allow POST requests
