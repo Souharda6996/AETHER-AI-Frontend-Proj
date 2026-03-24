@@ -2,8 +2,8 @@ import mammoth from "mammoth";
 import * as pdfjsLib from "pdfjs-dist";
 import Papa from "papaparse";
 
-// Initialize PDF.js worker directly to the correct version installed in package.json
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/5.5.207/pdf.worker.min.js`;
+// Initialize PDF.js worker using a reliable CDN that matches the installed version
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 export const extractTextFromFile = async (file: File): Promise<string> => {
   const fileType = file.type;

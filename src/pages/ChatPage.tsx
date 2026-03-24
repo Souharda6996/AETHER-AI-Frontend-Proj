@@ -25,6 +25,7 @@ import {
 } from "../components/ui/dropdown-menu";
 import { downloadAsText, downloadAsPDF, downloadAsImage } from "../utils/downloadUtils";
 import { extractTextFromFile, fileToBase64 } from "../utils/fileParser";
+import FileAttachmentCard from "../components/FileAttachmentCard";
 
 interface Message {
   id: string;
@@ -32,6 +33,12 @@ interface Message {
   content: string;
   timestamp: any;
   feedback?: "positive" | "negative" | null;
+  attachments?: Array<{
+    name: string;
+    type: string;
+    size?: number;
+    previewUrl?: string;
+  }>;
 }
 
 interface Conversation {
@@ -51,16 +58,10 @@ export interface UploadedFile {
 }
 
 const API_KEY = import.meta.env.VITE_API_KEY || "[PASTE YOUR KEY HERE]";
-const BACKEND_URL = "http://localhost:8000/api/v1";
 
 if (!API_KEY || API_KEY === "[PASTE YOUR GROQ API KEY HERE]" || API_KEY === "[PASTE YOUR KEY HERE]") {
   console.error("API KEY IS MISSING!");
 }
-
-const sanitizeContent = (content: string) => {
-  if (!content) return "";
-  return content.replace(/<br\s*\/?>/gi, "\n");
-};
 
 const ChatPage = () => {
   const { currentUser, logout } = useAuth();
@@ -113,7 +114,6 @@ const ChatPage = () => {
       });
       setSelectedFiles(prev => [...prev, ...newFiles]);
     }
-    // Reset input so the same file can be selected again if removed
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -125,7 +125,6 @@ const ChatPage = () => {
     });
   };
 
-  // Auto-scroll to bottom whenever messages update
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ 
@@ -133,9 +132,8 @@ const ChatPage = () => {
         block: 'end'
       });
     }
-  }, [messages, displayedStreamingMessage]); // triggers on new messages or typewriter updates
+  }, [messages, displayedStreamingMessage]);
 
-  // Also scroll to bottom on initial load
   useEffect(() => {
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
@@ -161,8 +159,20 @@ const ChatPage = () => {
       orderBy("timestamp", "asc")
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      const firestoreMsgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
       if (!snapshot.empty) {
-        setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message)));
+        setMessages(prev => {
+          // Keep local assistant messages (errors or thinking) that aren't in Firestore yet
+          const localOnly = prev.filter(p => p.role === 'assistant' && !firestoreMsgs.some(f => f.id === p.id));
+          return [...firestoreMsgs, ...localOnly].sort((a,b) => {
+            const getMillis = (m: Message) => {
+              if (m.timestamp?.toDate) return m.timestamp.toDate().getTime();
+              if (m.timestamp) return new Date(m.timestamp).getTime();
+              return Date.now(); // Fallback for pending
+            };
+            return getMillis(a) - getMillis(b);
+          });
+        });
       } else {
         setMessages([{
           id: "initial-1",
@@ -175,7 +185,6 @@ const ChatPage = () => {
     return () => unsubscribe();
   }, [activeConversationId, currentUser]);
 
-  // Slow Typewriter Effect for Bot Responses
   useEffect(() => {
     if (!isStreaming || !streamingMessage || isPaused) {
       if (!isStreaming) {
@@ -187,16 +196,12 @@ const ChatPage = () => {
 
     if (displayedStreamingMessage.length < streamingMessage.length) {
       const timeout = setTimeout(() => {
-        // Force a slower, more deliberate pace (approx 30ms per char)
         setDisplayedStreamingMessage(streamingMessage.slice(0, displayedStreamingMessage.length + 1));
       }, 30);
       return () => clearTimeout(timeout);
     } else if (displayedStreamingMessage.length === streamingMessage.length && streamingMessage.length > 0) {
-      // Animation finished - finalize the message
       const finalizeMessage = async () => {
         const reply = streamingMessage;
-        
-        // 1. Persist to Firestore (this will trigger the onSnapshot)
         if (currentUser && activeConversationId) {
           try {
             await addDoc(collection(db, "users", currentUser.uid, "conversations", activeConversationId, "messages"), {
@@ -204,30 +209,18 @@ const ChatPage = () => {
               content: reply,
               timestamp: serverTimestamp()
             });
-            console.log('✅ AI response finalized and saved to journal');
           } catch (error) {
             console.error('Error finalizing message:', error);
           }
         }
         
-        // 2. Clean up streaming states ONLY after a short delay to let Firestore sync
-        // OR add to local state immediately to avoid flicker
-        setMessages(prev => [...prev, {
-           id: crypto.randomUUID(),
-           role: 'assistant',
-           content: reply,
-           timestamp: new Date()
-        }]);
-
         setStreamingMessage("");
         setDisplayedStreamingMessage("");
         setIsStreaming(false);
       };
-      
       finalizeMessage();
     }
   }, [streamingMessage, displayedStreamingMessage, isStreaming, currentUser, activeConversationId]);
-
 
   const handleStop = () => {
     if (abortController) {
@@ -245,17 +238,14 @@ const ChatPage = () => {
   };
 
   const sendMessage = async (inputText: string) => {
-    const trimmed = inputText.trim();
-    if ((!trimmed && selectedFiles.length === 0) || isStreaming) return;
-
-    // We add to local state immediately for fast feedback (UI purposes)
-    const displayUserContent = trimmed + (selectedFiles.length > 0 ? `\n\n[Attached ${selectedFiles.length} file(s)]` : "");
+    const trimmedInput = inputText.trim();
+    if ((!trimmedInput && selectedFiles.length === 0) || isStreaming) return;
 
     let convId = activeConversationId;
     
     if (!convId && currentUser) {
       const convRef = await addDoc(collection(db, "users", currentUser.uid, "conversations"), {
-        title: (trimmed || "New Session").slice(0, 40) + ((trimmed || "New").length > 40 ? "..." : ""),
+        title: (trimmedInput || "New Session").slice(0, 40) + ((trimmedInput || "New").length > 40 ? "..." : ""),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
@@ -267,19 +257,26 @@ const ChatPage = () => {
       });
     }
 
-    const userMsg = {
+    const attachments = selectedFiles.map(f => ({
+      name: f.file.name,
+      type: f.file.type,
+      size: f.file.size,
+      previewUrl: f.type === 'image' ? f.previewUrl : undefined
+    }));
+
+    const userMsg: Message = {
       id:        crypto.randomUUID(),
       role:      'user' as const,
-      content:   displayUserContent,
+      content:   trimmedInput,
       timestamp: new Date().toISOString(),
+      attachments: attachments.length > 0 ? attachments : undefined
     };
     
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsStreaming(true);
     
-    // Process files
-    let combinedInputText = trimmed;
+    let combinedInputText = trimmedInput;
     let base64Images: string[] = [];
 
     if (selectedFiles.length > 0) {
@@ -305,20 +302,15 @@ const ChatPage = () => {
     if (currentUser && convId) {
       await addDoc(collection(db, "users", currentUser.uid, "conversations", convId, "messages"), {
         role: "user",
-        content: displayUserContent,
-        timestamp: serverTimestamp()
+        content: trimmedInput,
+        timestamp: serverTimestamp(),
+        attachments: attachments.length > 0 ? attachments : null
       });
     }
 
     try {
       const API_ENDPOINT = '/api/chat';
-
-      // We send the parsed text (combinedInputText) to the backend
-      const historyMsgForBackend = {
-        role: 'user',
-        content: combinedInputText
-      };
-
+      const historyMsgForBackend = { role: 'user', content: combinedInputText };
       const history = [...messages.filter(m => m.id !== "initial-1"), historyMsgForBackend].map(m => ({
         role:    m.role === 'user' ? 'user' : 'assistant',
         content: m.content,
@@ -326,6 +318,7 @@ const ChatPage = () => {
 
       const controller = new AbortController();
       setAbortController(controller);
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
 
       const res = await fetch(API_ENDPOINT, {
         method:  'POST',
@@ -338,44 +331,48 @@ const ChatPage = () => {
         }),
       });
 
-      const rawText = await res.text();
+      clearTimeout(timeoutId);
+
+      if (res.status === 413) {
+        throw new Error('The uploaded file or message is too large for the processing engine (Max 50MB local / 4.5MB cloud). Please try a smaller file.');
+      }
       
+      if (res.status === 404) throw new Error('API route not found. Please ensure the backend server is running.');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Server error: ${res.status}`);
+      }
+
+      const rawText = await res.text();
       let data: any;
       try {
         data = JSON.parse(rawText);
       } catch {
-        throw new Error('Server returned an invalid response');
+        throw new Error(`Server returned invalid response (Status ${res.status}).`);
       }
 
-      if (!res.ok) {
-        throw new Error(data?.error ?? `Server error ${res.status}`);
-      }
+      if (!res.ok) throw new Error(data?.error ?? data?.message ?? `Server error ${res.status}`);
 
-      const reply: string = 
-        data?.reply    ?? 
-        data?.content  ?? 
-        data?.message  ?? 
-        data?.text     ?? 
-        data?.response ?? 
-        '';
-
-      if (!reply.trim()) {
-        throw new Error('Received empty response from AI');
-      }
+      const reply: string = data?.reply ?? data?.content ?? data?.message ?? data?.text ?? data?.response ?? '';
+      if (!reply.trim()) throw new Error('Received empty response from AI');
 
       setStreamingMessage(reply);
       setDisplayedStreamingMessage("");
+      // NOTE: We do NOT set setIsStreaming(false) here. 
+      // The Typewriter useEffect will do it when finished typing.
 
     } catch (err: any) {
+      setIsStreaming(false); // Reset on error
+      if (err.name === 'AbortError') {
+        toast.error("Request timed out after 60 seconds.");
+      }
       console.error('❌ sendMessage failed:', err?.message);
       
-      const errorContent = err?.message?.includes('API key') 
-                   ? 'Configuration error: API key missing.'
-                   : err?.message?.includes('rate limit')
-                   ? 'Too many requests. Please wait a moment.'
-                   : err?.message?.includes('Payload Too Large')
-                   ? 'The uploaded files are too large for the system to process. Please try smaller files.'
-                   : `Error: ${err?.message ?? 'Unknown error'}`;
+      const errorContent = err?.name === 'AbortError' 
+        ? '⚠️ Request timed out. The server took too long to respond. Please try again.'
+        : err?.message?.includes('Payload Too Large')
+        ? '⚠️ Files too large for processing.'
+        : `⚠️ Error: ${err?.message ?? 'Unknown error'}`;
 
       setMessages(prev => [...prev, {
         id:        crypto.randomUUID(),
@@ -383,7 +380,9 @@ const ChatPage = () => {
         content:   errorContent,
         timestamp: new Date().toISOString(),
       }]);
-      setIsStreaming(false);
+    } finally {
+      // Only reset non-streaming state here
+      setAbortController(null);
     }
   };
 
@@ -394,7 +393,6 @@ const ChatPage = () => {
       await updateDoc(doc(db, "users", currentUser.uid, "conversations", activeConversationId), {
         updatedAt: serverTimestamp()
       });
-      
       await sendMessage(lastUserMsg.content);
     }
   };
@@ -403,7 +401,6 @@ const ChatPage = () => {
     if (!currentUser || !activeConversationId) return;
     const msg = messages.find(m => m.id === msgId);
     if (!msg) return;
-    
     const newFeedback = msg.feedback === type ? null : type;
     await updateDoc(doc(db, "users", currentUser.uid, "conversations", activeConversationId, "messages", msgId), {
       feedback: newFeedback
@@ -428,17 +425,11 @@ const ChatPage = () => {
   };
 
   return (
-    // ── LEVEL 1: Full screen wrapper ──
     <div className="fixed inset-0 flex overflow-hidden bg-[#081B1B] text-[#EEE8B2] font-sans">
-      {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          onClick={() => setIsSidebarOpen(false)}
-        />
+        <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />
       )}
 
-      {/* ── LEVEL 2A: Sidebar ── */}
       <aside className={`fixed inset-y-0 left-0 z-50 w-64 md:relative flex flex-col flex-shrink-0 h-full border-r border-[#5A8F76]/30 bg-[#081B1B] p-4 transform transition-transform duration-300 sidebar-gradient overflow-y-auto overflow-x-hidden ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
         <div className="flex items-center justify-between px-2 mb-8 flex-shrink-0">
           <Link to="/" className="flex items-center gap-2 group">
@@ -453,10 +444,7 @@ const ChatPage = () => {
           </button>
         </div>
 
-        <button 
-          onClick={resetChat}
-          className="flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-gradient-to-r from-[#C18D52]/10 to-transparent border border-[#C18D52]/20 text-[#C18D52] hover:from-[#C18D52]/20 transition-all duration-300 mb-6 group flex-shrink-0"
-        >
+        <button onClick={resetChat} className="flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-gradient-to-r from-[#C18D52]/10 to-transparent border border-[#C18D52]/20 text-[#C18D52] hover:from-[#C18D52]/20 transition-all duration-300 mb-6 group flex-shrink-0">
           <Plus className="h-4 w-4 group-hover:rotate-90 transition-transform duration-300" />
           <span className="text-sm font-semibold tracking-wide">New intelligence thread</span>
         </button>
@@ -504,13 +492,11 @@ const ChatPage = () => {
         </div>
       </aside>
 
-      {/* ── LEVEL 2B: Main chat column ── */}
       <main className="flex flex-col flex-1 h-full min-h-0 overflow-hidden relative bg-[#F5F2E0]" style={{
         backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(90, 143, 118, 0.04) 39px, rgba(90, 143, 118, 0.04) 40px)`,
         border: '1px solid rgba(193, 141, 82, 0.3)',
         boxShadow: `0 16px 48px rgba(8, 27, 27, 0.35), 0 0 0 1px rgba(193, 141, 82, 0.1) inset`
       }}>
-        {/* ── LEVEL 3A: Top header bar ── */}
         <header className="flex-shrink-0 h-14 border-b border-rgba(193, 141, 82, 0.2) flex items-center justify-between px-4 md:px-6 bg-gradient-to-r from-[#203B37] to-[#081B1B] z-10 w-full">
           <div className="flex items-center gap-3">
              <button className="md:hidden p-2 rounded-lg hover:bg-[#081B1B]/50" onClick={() => setIsSidebarOpen(true)}>
@@ -535,11 +521,7 @@ const ChatPage = () => {
           </div>
         </header>
 
-        {/* ── LEVEL 3B: Messages scroll area ── */}
-        <div 
-          ref={messagesContainerRef}
-          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-6 space-y-8 messages-scroll-area custom-scrollbar scroll-smooth"
-        >
+        <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-6 space-y-8 messages-scroll-area custom-scrollbar scroll-smooth">
           <div className="w-full max-w-3xl mx-auto space-y-8 pb-12">
             <AnimatePresence>
               {messages.map((msg, index) => (
@@ -549,34 +531,26 @@ const ChatPage = () => {
                   animate={{ opacity: 1, y: 0 }}
                   className={`flex flex-row items-end gap-2 w-full mb-4 ${msg.role === "assistant" ? "justify-start pr-20" : "justify-end pl-20"}`}
                 >
-                  <div className={`w-9 h-9 min-w-[36px] flex-shrink-0 flex-grow-0 rounded-full bg-[#242F48] flex items-center justify-center shadow-lg`}>
+                  <div className="w-9 h-9 min-w-[36px] flex-shrink-0 flex-grow-0 rounded-full bg-[#242F48] flex items-center justify-center shadow-lg">
                     {msg.role === "assistant" ? <Bot className="mx-auto h-5 w-5 text-[#FFA586]" /> : <User className="mx-auto h-5 w-5 text-[#E8E0F0]" />}
                   </div>
                   <div className={`flex flex-col max-w-[70%] w-fit ${msg.role === "user" ? "items-end" : "items-start"}`}>
-                    {msg.role === "assistant" && (
-                      <span className="mb-1 ml-1 text-[#5A8F76] text-[10px] font-bold uppercase tracking-widest">AETHER</span>
-                    )}
-                    <div id={`msg-${msg.id}`} className={`max-w-full w-fit break-words overflow-wrap-anywhere whitespace-pre-wrap transition-all duration-300 ${
-                      msg.role === "assistant"
-                        ? "overflow-hidden bg-white text-[#081B1B] text-[0.95rem] leading-relaxed px-4 py-3 rounded-[4px_18px_18px_18px] border border-[rgba(90,143,118,0.2)] shadow-sm"
-                        : "bg-gradient-to-br from-[#C18D52] to-[#D4A96A] text-[#081B1B] font-medium text-[0.95rem] leading-relaxed px-4 py-2.5 rounded-[18px_4px_18px_18px]"
-                    }`}>
-                      {msg.role === "assistant" ? (
-                        <ReactMarkdown 
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            table: ({node, ...props}) => (
-                              <div className="w-full max-w-full overflow-x-auto">
-                                <table className="w-full min-w-[unset]" {...props} />
-                              </div>
-                            )
-                          }}
-                        >
-                          {msg.content || (msg.role === "assistant" && (!isStreaming || index < messages.length - 1) ? "I encountered an issue generating a response. Please try again." : "")}
-                        </ReactMarkdown>
-                      ) : (
-                        msg.content
+                    {msg.role === "assistant" && <span className="mb-1 ml-1 text-[#5A8F76] text-[10px] font-bold uppercase tracking-widest">AETHER</span>}
+                    <div id={`msg-${msg.id}`} className="flex flex-col gap-2 max-w-full w-fit transition-all duration-300">
+                      {msg.role === "user" && msg.attachments && msg.attachments.length > 0 && (
+                        <div className="flex flex-col gap-2 mb-1">
+                          {msg.attachments.map((file, i) => (
+                            <FileAttachmentCard key={i} name={file.name} type={file.type} size={file.size} previewUrl={file.previewUrl} isDarkMode={false} />
+                          ))}
+                        </div>
                       )}
+                      <div className={`break-words overflow-wrap-anywhere whitespace-pre-wrap ${msg.role === "assistant" ? "bg-white text-[#081B1B] text-[0.95rem] leading-relaxed px-4 py-3 rounded-[4px_18px_18px_18px] border border-[rgba(90,143,118,0.2)] shadow-sm" : "bg-gradient-to-br from-[#C18D52] to-[#D4A96A] text-[#081B1B] font-medium text-[0.95rem] leading-relaxed px-4 py-2.5 rounded-[18px_4px_18px_18px] shadow-sm ml-auto"}`}>
+                        {msg.role === "assistant" ? (
+                          <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ table: ({node, ...props}) => (<div className="w-full max-w-full overflow-x-auto"><table className="w-full min-w-[unset]" {...props} /></div>) }}>
+                            {msg.content || (msg.role === "assistant" && (!isStreaming || index < messages.length - 1) ? "I encountered an issue generating a response. Please try again." : "")}
+                          </ReactMarkdown>
+                        ) : msg.content}
+                      </div>
                     </div>
                     
                     <div className={`flex items-center gap-2 mt-2 ${msg.role === "assistant" ? "ml-1" : "mr-1"} transition-opacity opacity-70 hover:opacity-100`}>
@@ -584,8 +558,7 @@ const ChatPage = () => {
                         {msg.timestamp?.toDate ? msg.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                       {msg.role === "user" && <span className="text-[#96CDB0] text-[10px]">✓✓</span>}
-                      
-                       {msg.role === "assistant" && msg.id !== "initial-1" && (
+                      {msg.role === "assistant" && msg.id !== "initial-1" && (
                         <div className="flex items-center gap-1">
                           <button onClick={() => handleCopy(msg.id, msg.content)} className="p-1.5 rounded hover:bg-[#EEE8B2]/50 text-[#5A8F76] transition-all duration-200">
                             {copiedId === msg.id ? <Check className="h-3.5 w-3.5 text-[#C18D52]" /> : <Copy className="h-3.5 w-3.5 hover:text-[#C18D52]" />}
@@ -593,48 +566,18 @@ const ChatPage = () => {
                           <button onClick={() => handleFeedback(msg.id, "positive")} className={`p-1.5 rounded hover:bg-[#EEE8B2]/50 transition-all duration-200 ${msg.feedback === "positive" ? "text-[#C18D52]" : "text-[#5A8F76]"}`}>
                             <ThumbsUp className={`h-3.5 w-3.5 hover:text-[#C18D52] ${msg.feedback === "positive" ? "fill-[#C18D52]" : ""}`} />
                           </button>
-                          
                           <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button className="p-1.5 rounded hover:bg-[#EEE8B2]/50 text-[#5A8F76] transition-all duration-200">
-                                <Download className="h-3.5 w-3.5 hover:text-[#C18D52]" />
-                              </button>
-                            </DropdownMenuTrigger>
+                            <DropdownMenuTrigger asChild><button className="p-1.5 rounded hover:bg-[#EEE8B2]/50 text-[#5A8F76] transition-all duration-200"><Download className="h-3.5 w-3.5 hover:text-[#C18D52]" /></button></DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-48 bg-[#081B1B] border-[#5A8F76]/30 text-[#EEE8B2]">
                               <span className="text-xs font-semibold px-2 py-1.5 text-[#5A8F76]">Export Options</span>
                               <DropdownMenuSeparator className="bg-[#5A8F76]/20" />
-                              <DropdownMenuItem 
-                                onClick={() => downloadAsPDF(`msg-${msg.id}`, `AetherAI_Response_${new Date().toISOString().split('T')[0]}.pdf`)}
-                                className="text-sm cursor-pointer hover:bg-[#5A8F76]/20 focus:bg-[#5A8F76]/20"
-                              >
-                                <FileText className="mr-2 h-4 w-4 text-[#C18D52]" />
-                                Download as PDF
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => downloadAsText(msg.content, `AetherAI_Response_${new Date().toISOString().split('T')[0]}.txt`)}
-                                className="text-sm cursor-pointer hover:bg-[#5A8F76]/20 focus:bg-[#5A8F76]/20"
-                              >
-                                <FileCode className="mr-2 h-4 w-4 text-[#96CDB0]" />
-                                Download as TXT
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => downloadAsImage(`msg-${msg.id}`, `AetherAI_Image_${new Date().toISOString().split('T')[0]}.png`)}
-                                className="text-sm cursor-pointer hover:bg-[#5A8F76]/20 focus:bg-[#5A8F76]/20"
-                              >
-                                <Image className="mr-2 h-4 w-4 text-[#FFA586]" />
-                                Download as Image
-                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => downloadAsPDF(`msg-${msg.id}`, `AetherAI_Response_${new Date().toISOString().split('T')[0]}.pdf`)} className="text-sm cursor-pointer hover:bg-[#5A8F76]/20 focus:bg-[#5A8F76]/20"><FileText className="mr-2 h-4 w-4 text-[#C18D52]" />Download as PDF</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => downloadAsText(msg.content, `AetherAI_Response_${new Date().toISOString().split('T')[0]}.txt`)} className="text-sm cursor-pointer hover:bg-[#5A8F76]/20 focus:bg-[#5A8F76]/20"><FileCode className="mr-2 h-4 w-4 text-[#96CDB0]" />Download as TXT</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => downloadAsImage(`msg-${msg.id}`, `AetherAI_Image_${new Date().toISOString().split('T')[0]}.png`)} className="text-sm cursor-pointer hover:bg-[#5A8F76]/20 focus:bg-[#5A8F76]/20"><Image className="mr-2 h-4 w-4 text-[#FFA586]" />Download as Image</DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
-
-                          <button onClick={() => handleFeedback(msg.id, "negative")} className={`p-1.5 rounded hover:bg-[#EEE8B2]/50 transition-all duration-200 ${msg.feedback === "negative" ? "text-[#C18D52]" : "text-[#5A8F76]"}`}>
-                            <ThumbsDown className={`h-3.5 w-3.5 hover:text-[#C18D52] ${msg.feedback === "negative" ? "fill-[#C18D52]" : ""}`} />
-                          </button>
-                          {index === messages.length - 1 && (
-                            <button onClick={() => handleRegenerate(msg.content)} className="p-1.5 rounded hover:bg-[#EEE8B2]/50 text-[#5A8F76] transition-all duration-200 group relative">
-                              <RefreshCw className="h-3.5 w-3.5 hover:text-[#C18D52] group-active:animate-spin" />
-                            </button>
-                          )}
+                          <button onClick={() => handleFeedback(msg.id, "negative")} className={`p-1.5 rounded hover:bg-[#EEE8B2]/50 transition-all duration-200 ${msg.feedback === "negative" ? "text-[#C18D52]" : "text-[#5A8F76]"}`}><ThumbsDown className={`h-3.5 w-3.5 hover:text-[#C18D52] ${msg.feedback === "negative" ? "fill-[#C18D52]" : ""}`} /></button>
+                          {index === messages.length - 1 && (<button onClick={() => handleRegenerate(msg.content)} className="p-1.5 rounded hover:bg-[#EEE8B2]/50 text-[#5A8F76] transition-all duration-200 group relative"><RefreshCw className="h-3.5 w-3.5 hover:text-[#C18D52] group-active:animate-spin" /></button>)}
                         </div>
                       )}
                     </div>
@@ -644,125 +587,52 @@ const ChatPage = () => {
             </AnimatePresence>
             
             {isStreaming && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }} 
-                animate={{ opacity: 1, y: 0 }}
-                className="flex flex-row justify-start items-end gap-2 w-full mb-4 pr-20"
-              >
-                <div className="w-9 h-9 min-w-[36px] flex-shrink-0 flex-grow-0 rounded-full bg-[#242F48] flex items-center justify-center shadow-lg">
-                  <Bot className="h-5 w-5 text-[#FFA586]" />
-                </div>
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-row justify-start items-end gap-2 w-full mb-4 pr-20">
+                <div className="w-9 h-9 min-w-[36px] flex-shrink-0 flex-grow-0 rounded-full bg-[#242F48] flex items-center justify-center shadow-lg"><Bot className="h-5 w-5 text-[#FFA586]" /></div>
                 <div className="flex flex-col max-w-[70%] w-fit mr-auto">
                   {currentAgent ? (
                     <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#EEE8B2] border border-[#C18D52]/20 text-[11px] font-bold text-[#5A8F76] uppercase tracking-widest italic animate-pulse">
-                        <span className="h-2 w-2 bg-[#C18D52] rounded-full animate-pulse mr-1"></span>
-                        Aether is processing...
-                      </div>
-                      <div className="flex items-center gap-1.5 px-5 py-3.5 rounded-2xl rounded-tl-none bg-white border border-[#5A8F76]/20 shadow-sm w-fit">
-                        <span className="h-1.5 w-1.5 bg-[#C18D52] rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                        <span className="h-1.5 w-1.5 bg-[#C18D52] rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                        <span className="h-1.5 w-1.5 bg-[#C18D52] rounded-full animate-bounce"></span>
-                      </div>
+                      <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#EEE8B2] border border-[#C18D52]/20 text-[11px] font-bold text-[#5A8F76] uppercase tracking-widest italic animate-pulse"><span className="h-2 w-2 bg-[#C18D52] rounded-full animate-pulse mr-1"></span>Aether is processing...</div>
+                      <div className="flex items-center gap-1.5 px-5 py-3.5 rounded-2xl rounded-tl-none bg-white border border-[#5A8F76]/20 shadow-sm w-fit"><span className="h-1.5 w-1.5 bg-[#C18D52] rounded-full animate-bounce [animation-delay:-0.3s]"></span><span className="h-1.5 w-1.5 bg-[#C18D52] rounded-full animate-bounce [animation-delay:-0.15s]"></span><span className="h-1.5 w-1.5 bg-[#C18D52] rounded-full animate-bounce"></span></div>
                     </div>
                   ) : (
-                    <div className="max-w-full w-fit break-words overflow-wrap-anywhere whitespace-pre-wrap overflow-hidden bg-white text-[#081B1B] text-[0.95rem] leading-relaxed px-4 py-3 rounded-[4px_18px_18px_18px] border border-[rgba(90,143,118,0.2)] shadow-sm font-medium overflow-x-auto custom-markdown bot-bubble">
-                      <ReactMarkdown 
-                        remarkPlugins={[remarkGfm]}
-                        components={{
-                          table: ({node, ...props}) => (
-                            <div className="w-full max-w-full overflow-x-auto">
-                              <table className="w-full min-w-[unset]" {...props} />
-                            </div>
-                          )
-                        }}
-                      >
-                        {displayedStreamingMessage || (currentAgent ? "Aether is processing..." : isStreaming ? "Aether is thinking..." : "")}
+                    <div className="max-w-full w-fit break-words overflow-wrap-anywhere whitespace-pre-wrap overflow-hidden bg-white text-[#081B1B] text-[0.95rem] leading-relaxed px-4 py-3 rounded-[4px_18px_18px_18px] border border-[rgba(90,143,118,0.2)] shadow-sm font-medium bot-bubble">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ table: ({node, ...props}) => (<div className="w-full max-w-full overflow-x-auto"><table className="w-full min-w-[unset]" {...props} /></div>) }}>
+                        {displayedStreamingMessage || (isStreaming ? "Aether is thinking..." : "")}
                       </ReactMarkdown>
-                      <motion.span
-                        animate={{ opacity: [1, 0] }}
-                        transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
-                        className="inline-block w-1.5 h-4 bg-[#C18D52] align-middle ml-1"
-                      />
+                      <motion.span animate={{ opacity: [1, 0] }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} className="inline-block w-1.5 h-4 bg-[#C18D52] align-middle ml-1" />
                     </div>
                   )}
                 </div>
               </motion.div>
             )}
-            {/* Invisible scroll anchor */}
             <div ref={messagesEndRef} className="h-px w-full" />
           </div>
         </div>
 
-        {/* ── LEVEL 3C: Input bar ── */}
         <div className="flex-shrink-0 p-4 md:p-8 border-t border-[#C18D52]/20 z-10 w-full relative bg-[#EEE8B2]/50">
           <div className="max-w-3xl mx-auto relative group">
             {selectedFiles.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-3 px-2">
                 <AnimatePresence>
                   {selectedFiles.map(file => (
-                    <motion.div 
-                      key={file.id} 
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      className="relative flex items-center gap-2 bg-white/80 border border-[#5A8F76]/30 backdrop-blur-sm rounded-lg px-2 py-1.5 shadow-sm pr-8"
-                    >
-                      {file.type === 'image' ? (
-                        <img src={file.previewUrl} alt={file.file.name} className="h-8 w-8 object-cover rounded bg-[#081B1B]/10" />
-                      ) : (
-                        <div className="h-8 w-8 rounded bg-[#5A8F76]/10 flex items-center justify-center">
-                          {file.type === 'document' ? <FileText className="h-4 w-4 text-[#5A8F76]" /> : 
-                           file.type === 'code' ? <CodeIcon className="h-4 w-4 text-[#C18D52]" /> : 
-                           <FileText className="h-4 w-4 text-[#5A8F76]" />}
-                        </div>
-                      )}
-                      <div className="flex flex-col max-w-[120px]">
-                        <span className="text-xs font-semibold text-[#081B1B] truncate">{file.file.name}</span>
-                        <span className="text-[9px] text-[#5A8F76]">{(file.file.size / 1024).toFixed(1)} KB</span>
-                      </div>
-                      <button 
-                        onClick={() => removeFile(file.id)}
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 hover:bg-black/5 rounded-full text-[#5A8F76] hover:text-[#B51A2B] transition-colors"
-                      >
-                        <XCircle className="h-4 w-4" />
-                      </button>
+                    <motion.div key={file.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }}>
+                      <FileAttachmentCard name={file.file.name} type={file.file.type} size={file.file.size} previewUrl={file.previewUrl} onRemove={() => removeFile(file.id)} isDarkMode={true} />
                     </motion.div>
                   ))}
                 </AnimatePresence>
               </div>
             )}
-            <div className={`relative flex items-center bg-white border border-[#5A8F76]/30 rounded-[24px] shadow-sm transition-all pl-2 pr-2 py-2 group-focus-within:border-[#C18D52] group-focus-within:ring-4 group-focus-within:ring-[#C18D52]/15 ${isStreaming ? '' : ''}`}>
-                
-                {/* Hidden File Input */}
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={handleFileSelect} 
-                  multiple 
-                  className="hidden" 
-                  accept="image/*,.pdf,.doc,.docx,.txt,.csv,.xlsx,.json,.js,.ts,.py"
-                />
-
+            <div className="relative flex items-center bg-white border border-[#5A8F76]/30 rounded-[24px] shadow-sm transition-all pl-2 pr-2 py-2 group-focus-within:border-[#C18D52] group-focus-within:ring-4 group-focus-within:ring-[#C18D52]/15">
+                <input type="file" ref={fileInputRef} onChange={handleFileSelect} multiple className="hidden" accept="image/*,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/csv,application/json,text/javascript,text/typescript,text/x-python" />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="h-[42px] w-[42px] shrink-0 rounded-full flex items-center justify-center transition-all duration-200 text-[#5A8F76] hover:bg-[#5A8F76]/10 hover:text-[#C18D52]">
-                      <Paperclip className="h-5 w-5" />
-                    </button>
+                    <button className="h-[42px] w-[42px] shrink-0 rounded-full flex items-center justify-center transition-all duration-200 text-[#5A8F76] hover:bg-[#5A8F76]/10 hover:text-[#C18D52]"><Paperclip className="h-5 w-5" /></button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" sideOffset={12} className="w-56 bg-white border-[#5A8F76]/30 shadow-[0_8px_30px_rgb(0,0,0,0.12)] text-[#081B1B] rounded-xl p-2 z-[100]">
-                    <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="cursor-pointer font-medium py-2.5 rounded-lg hover:bg-[#5A8F76]/10 focus:bg-[#5A8F76]/10 mb-1">
-                      <HardDrive className="mr-3 h-4 w-4 text-[#5A8F76]" />
-                      Upload files
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="cursor-pointer font-medium py-2.5 rounded-lg hover:bg-[#5A8F76]/10 focus:bg-[#5A8F76]/10 mb-1">
-                      <Image className="mr-3 h-4 w-4 text-[#C18D52]" />
-                      Photos
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="cursor-pointer font-medium py-2.5 rounded-lg hover:bg-[#5A8F76]/10 focus:bg-[#5A8F76]/10">
-                      <CodeIcon className="mr-3 h-4 w-4 text-[#96CDB0]" />
-                      Import code
-                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="cursor-pointer font-medium py-2.5 rounded-lg hover:bg-[#5A8F76]/10 focus:bg-[#5A8F76]/10 mb-1"><HardDrive className="mr-3 h-4 w-4 text-[#5A8F76]" />Upload files</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="cursor-pointer font-medium py-2.5 rounded-lg hover:bg-[#5A8F76]/10 focus:bg-[#5A8F76]/10 mb-1"><Image className="mr-3 h-4 w-4 text-[#C18D52]" />Photos</DropdownMenuItem>
+                    <DropdownMenuItem className="cursor-pointer font-medium py-2.5 rounded-lg hover:bg-[#5A8F76]/10 focus:bg-[#5A8F76]/10"><CodeIcon className="mr-3 h-4 w-4 text-[#96CDB0]" />Import code</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
 
@@ -775,37 +645,27 @@ const ChatPage = () => {
                   className="flex-1 bg-transparent border-none focus:outline-none text-[15px] font-medium py-3 text-[#081B1B] placeholder:text-[#5A8F76] placeholder:italic disabled:opacity-50"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                   onKeyDown={(e) => e.key === "Enter" && sendMessage(input)}
+                  onKeyDown={(e) => e.key === "Enter" && sendMessage(input)}
                   disabled={isStreaming}
                 />
                 
                 <div className="flex items-center gap-2">
                   {isStreaming && (
-                    <button 
-                      onClick={togglePause}
-                      className="h-[42px] w-[42px] shrink-0 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg bg-[#5A8F76] text-white hover:bg-[#C18D52]/80"
-                      title={isPaused ? "Resume" : "Pause"}
-                    >
+                    <button onClick={togglePause} className="h-[42px] w-[42px] shrink-0 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg bg-[#5A8F76] text-white hover:bg-[#C18D52]/80" title={isPaused ? "Resume" : "Pause"}>
                       {isPaused ? <Play className="h-4 w-4 fill-current" /> : <Pause className="h-4 w-4 fill-current" />}
                     </button>
                   )}
                   <button 
                     onClick={isStreaming ? handleStop : () => sendMessage(input)}
                     disabled={(isStreaming && !isStreaming) || (!isStreaming && !input.trim())}
-                    className={`h-[42px] w-[42px] shrink-0 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg group/btn ${
-                      isStreaming 
-                        ? "bg-[#B51A2B] text-white hover:bg-red-700" 
-                        : "bg-gradient-to-br from-[#203B37] to-[#081B1B] text-[#C18D52] hover:from-[#C18D52] hover:to-[#EEE8B2] hover:text-[#081B1B] hover:shadow-[0_4px_16px_rgba(193,141,82,0.4)] hover:scale-105 active:scale-95 disabled:opacity-50"
-                    }`}
+                    className={`h-[42px] w-[42px] shrink-0 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg group/btn ${isStreaming ? "bg-[#B51A2B] text-white hover:bg-red-700" : "bg-gradient-to-br from-[#203B37] to-[#081B1B] text-[#C18D52] hover:from-[#C18D52] hover:to-[#EEE8B2] hover:text-[#081B1B] hover:shadow-[0_4px_16px_rgba(193,141,82,0.4)] hover:scale-105 active:scale-95 disabled:opacity-50"}`}
                     title={isStreaming ? "Stop" : "Send"}
                   >
                     {isStreaming ? <Square className="h-4 w-4 fill-current" /> : <Send className="h-5 w-5 ml-0.5" />}
                   </button>
                 </div>
             </div>
-            <p className="text-[10px] text-center mt-3 text-[#5A8F76] font-medium hidden sm:block uppercase tracking-widest">
-              System Interface Active • Aether AI Core V4.2.0
-            </p>
+            <p className="text-[10px] text-center mt-3 text-[#5A8F76] font-medium hidden sm:block uppercase tracking-widest">System Interface Active • Aether AI Core V4.2.0</p>
           </div>
         </div>
       </main>

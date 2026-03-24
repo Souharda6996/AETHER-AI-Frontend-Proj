@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { GROQ_MODELS } from '../config/models';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Only allow POST requests
@@ -32,49 +33,56 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }))
     : [{ role: 'user', content: message }];
 
-  // If there are images and it's the latest message (which is at the end of history if we append it, 
-  // or we can just modify the very last 'user' message in history to include images)
+  // Handle images and format content blocks correctly for each provider
   const lastMsg = history[history.length - 1];
-  
-  if (provider === 'anthropic' && images && images.length > 0 && lastMsg.role === 'user') {
+  const hasImages = images && images.length > 0;
+
+  if (hasImages && lastMsg.role === 'user') {
     const contentBlocks: any[] = [];
     
-    // Add images
-    for (const b64 of images) {
-       // b64 is data:image/jpeg;base64,...
-       const match = b64.match(/^data:(image\/[a-zA-Z]*);base64,([^\"]*)$/);
-       if (match) {
-           contentBlocks.push({
-               type: "image",
-               source: {
-                   type: "base64",
-                   media_type: match[1],
-                   data: match[2]
-               }
-           });
-       }
-    }
-    
-    // Add text
+    // 1. Text block first (preferred by many vision models)
     if (typeof lastMsg.content === 'string') {
-        contentBlocks.push({
-            type: "text",
-            text: lastMsg.content
-        });
+      contentBlocks.push({ type: "text", text: lastMsg.content });
     }
-    
+
+    // 2. Image blocks
+    for (const b64 of images) {
+      const parts = b64.split(',');
+      if (parts.length < 2) continue;
+      
+      const mimeMatch = parts[0].match(/:(.*?);/);
+      const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+      const pureBase64 = parts[1];
+
+      if (provider === 'anthropic') {
+        contentBlocks.push({
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: mime,
+            data: pureBase64
+          }
+        });
+      } else {
+        // Groq / OpenAI format
+        contentBlocks.push({
+          type: "image_url",
+          image_url: { 
+            url: b64,
+            detail: "auto"
+          }
+        });
+      }
+    }
+
     lastMsg.content = contentBlocks;
-  }
-  
-  if (provider === 'groq' && images && images.length > 0) {
-      console.warn("Groq does not support images yet. Only text will be processed.");
   }
 
   try {
     let aiRes;
     
     if (provider === 'anthropic') {
-      console.log('🤖 Routing to Anthropic (Claude)...');
+      console.log('🤖 Routing to Anthropic Vision...');
       aiRes = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -85,12 +93,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         body: JSON.stringify({
           model:      'claude-3-5-sonnet-20241022',
           max_tokens: 2048,
-          system:     'You are Aether, a premium AI assistant. Professional, concise, and helpful.',
+          system:     'You are AetherAI, a premium assistant with advanced computer vision capabilities. Analyze the provided images carefully and provide detailed insights.',
           messages:   history,
         }),
       });
     } else {
-      console.log('🚀 Routing to Groq (Llama-3)...');
+      // Use centralized model config with .env fallback
+      const groqVisionModel = process.env.GROQ_VISION_MODEL || GROQ_MODELS.VISION;
+      const groqTextModel = process.env.GROQ_TEXT_MODEL || GROQ_MODELS.TEXT;
+      const groqModel = hasImages ? groqVisionModel : groqTextModel;
+
+      console.log(`🚀 Routing to Groq (${groqModel})...`);
       aiRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -98,12 +111,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           'Authorization': `Bearer ${activeKey}`,
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: groqModel,
           messages: [
-            { role: 'system', content: 'You are Aether, a premium AI assistant. Professional, concise, and helpful.' },
+            { role: 'system', content: 'You are AetherAI, a premium assistant with advanced vision capabilities. You can see and analyze images perfectly. When an image is provided, respond based on what you see in the image.' },
             ...history
           ],
           temperature: 0.7,
+          max_tokens: 2048
         }),
       });
     }
@@ -112,9 +126,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     if (!aiRes.ok) {
       console.error(`❌ ${provider} error:`, data?.error?.message || data?.error || 'Unknown error');
-      return res.status(aiRes.status).json({ 
-        error: `${provider} error: ${data?.error?.message || 'Invalid API Key or Service Limit'}` 
-      });
+      
+      // Enhanced Error Handling for Users
+      let friendlyError = 'An error occurred while processing your request. Please try again.';
+      const rawError = (data?.error?.message || JSON.stringify(data?.error) || '').toLowerCase();
+      
+      if (rawError.includes('decommissioned') || rawError.includes('not found') || rawError.includes('model_not_found')) {
+        friendlyError = 'The selected AI model is currently undergoing maintenance. Our engineers have been notified. Please try again in a few minutes.';
+      } else if (aiRes.status === 429) {
+        friendlyError = 'Too many requests. Please wait a moment and try again.';
+      } else if (rawError.includes('api key') || rawError.includes('authentication')) {
+        friendlyError = 'Authentication error. Please check your API configuration.';
+      }
+
+      return res.status(aiRes.status).json({ error: friendlyError });
     }
 
     let reply = '';
